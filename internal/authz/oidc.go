@@ -117,23 +117,33 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// then logout and redirect to the configured logout redirect uri.
 	if matchesLogoutPath(log, o.config, req.GetAttributes().GetRequest().GetHttp()) {
 		log.Info("handling logout request")
+	
+		// Attempt to remove the session only if sessionID is not empty
 		if sessionID != "" {
 			log.Info("removing session from session store during logout", "session-id", sessionID)
 			store := o.sessions.Get(o.config)
+	
+			// Check if session removal succeeds; log the error but do not set a deny response
 			if err := store.RemoveSession(ctx, sessionID); err != nil {
 				log.Error("error removing session", err)
-				setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
-				return nil
+				// Log the error but continue the flow; we won't set a deny response
 			}
 		}
+	
 		log.Info("logout complete. Redirecting to logout redirect uri",
 			"uri", o.config.GetLogout().GetRedirectUri())
 		deny := newDenyResponse()
-		// add IDP logout location
+	
+		// Add IDP logout location
+		log.Info("Adding IDP Logout location:" +  o.config.GetLogout().GetRedirectUri())
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
-		// add the set-cookie header to delete the session_id cookie
+	
+		// Add the set-cookie header to delete the session_id cookie
+		log.Info("Setting cookie header")
 		setSetCookieHeader(deny, generateSetCookieHeader(getCookieName(o.config), "deleted", 0))
-		setDenyResponse(resp, deny, codes.Unauthenticated)
+	
+		// Send the deny response without an error status, ensuring it’s a redirect
+		setDenyResponse(resp, deny, codes.OK) // Use codes.OK for a successful response
 		return nil
 	}
 
