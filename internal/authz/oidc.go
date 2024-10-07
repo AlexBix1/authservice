@@ -115,6 +115,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 
 	// If the request is for the configured logout path,
 	// then logout and redirect to the configured logout redirect uri.
+	log.Info("Logout Request path", req.GetAttributes().GetRequest().GetHttp())
 	if matchesLogoutPath(log, o.config, req.GetAttributes().GetRequest().GetHttp()) {
 		log.Info("handling logout request")
 	
@@ -135,7 +136,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		deny := newDenyResponse()
 	
 		// Add IDP logout location
-		log.Info("Adding IDP Logout location:" +  o.config.GetLogout().GetRedirectUri())
+		log.Info("Adding IDP Logout location:",  o.config.GetLogout().GetRedirectUri())
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
 	
 		// Add the set-cookie header to delete the session_id cookie
@@ -715,11 +716,14 @@ func matchesCallbackPath(log telemetry.Logger, config *oidcv1.OIDCConfig, httpRe
 // Request done by the end-user to log out.
 func matchesLogoutPath(log telemetry.Logger, config *oidcv1.OIDCConfig, httpReq *envoy.AttributeContext_HttpRequest) bool {
 	if config.GetLogout() == nil {
+		log.Info("Logout Path is NULL")
 		return false
 	}
 
 	reqPath, _, _ := inthttp.GetPathQueryFragment(httpReq.GetPath())
 	confPath := config.GetLogout().GetPath()
+	log.Info("CONF Path: ", confPath)
+	log.Info("REQ Path: ", reqPath)
 
 	if reqPath == confPath {
 		log.Debug("request matches configured logout uri")
